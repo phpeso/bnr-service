@@ -83,6 +83,15 @@ final readonly class NationalBankOfRomaniaService implements PesoServiceInterfac
     private function performHistoricalRequest(
         HistoricalExchangeRateRequest $request,
     ): ErrorResponse|ExchangeRateResponse {
+        if ($request->quoteCurrency !== 'RON') { // ROL and earlier are not supported
+            return new ErrorResponse(ExchangeRateNotFoundException::fromRequest($request));
+        }
+        $today = Calendar::fromDateTime($this->clock->now());
+
+        if ($today->sub($request->date) < 0) {
+            return new ErrorResponse(new ExchangeRateNotFoundException('Date seems to be in future'));
+        }
+
         throw new \Error('not implemented');
     }
 
