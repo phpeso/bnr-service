@@ -2,3 +2,5 @@
 /debug
 /.idea
 /vendor
+/.phpunit.result.cache
+/reports
