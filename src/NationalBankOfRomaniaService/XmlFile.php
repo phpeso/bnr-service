@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace Peso\Services\NationalBankOfRomaniaService;
 
+use Peso\Services\NationalBankOfRomaniaService\XmlFile\DataSet;
 use Sabre\Xml\Reader;
 
 final readonly class XmlFile
@@ -17,6 +18,7 @@ final readonly class XmlFile
     {
         $reader = new Reader();
         $reader->elementMap = [
+            '{http://www.bnr.ro/xsd}DataSet' => DataSet::class,
         ];
         $reader->XML($xml);
 
