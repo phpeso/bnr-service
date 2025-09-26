@@ -21,7 +21,9 @@ use Peso\Core\Requests\CurrentExchangeRateRequest;
 use Peso\Core\Requests\HistoricalExchangeRateRequest;
 use Peso\Core\Responses\ErrorResponse;
 use Peso\Core\Responses\ExchangeRateResponse;
+use Peso\Core\Services\IndirectExchangeService;
 use Peso\Core\Services\PesoServiceInterface;
+use Peso\Core\Services\ReversibleService;
 use Peso\Core\Services\SDK\Cache\NullCache;
 use Peso\Core\Services\SDK\Exceptions\CacheFailureException;
 use Peso\Core\Services\SDK\Exceptions\HttpFailureException;
@@ -43,7 +45,7 @@ final readonly class NationalBankOfRomaniaService implements PesoServiceInterfac
     public function __construct(
         private CacheInterface $cache = new NullCache(),
         private DateInterval $currentTtl = new DateInterval('PT1H'),
-        private DateInterval $historyTtl = new DateInterval('P60D'),
+        private DateInterval $historyTtl = new DateInterval('P7D'),
         private ClientInterface $httpClient = new DiscoveredHttpClient(),
         private RequestFactoryInterface $requestFactory = new DiscoveredRequestFactory(),
         private ClockInterface $clock = new SystemClock(),
@@ -99,9 +101,8 @@ final readonly class NationalBankOfRomaniaService implements PesoServiceInterfac
             [$rates, $date] = $this->findDayRates($request->date, $ratesXml);
         }
         if ($rates === null) { // not found or not in the last 15 days
-            $thisYear = $today->getYear() === $request->date->getYear();
             $endpoint = \sprintf(self::YEAR_RECORD, $request->date->getYear());
-            $ratesXml = $this->getXmlData($endpoint, $thisYear ? $this->currentTtl : $this->historyTtl);
+            $ratesXml = $this->getXmlData($endpoint, $this->historyTtl);
             [$rates, $date] = $this->findDayRates($request->date, $ratesXml);
         }
         if ($rates === null) { // edge case: no data from the beginning of the year
