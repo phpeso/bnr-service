@@ -11,6 +11,7 @@ namespace Peso\Services;
 
 use Arokettu\Clock\SystemClock;
 use Arokettu\Date\Calendar;
+use Arokettu\Date\Date;
 use DateInterval;
 use Override;
 use Peso\Core\Exceptions\ExchangeRateNotFoundException;
@@ -37,7 +38,7 @@ final readonly class NationalBankOfRomaniaService implements PesoServiceInterfac
 {
     private const LAST_RECORD = 'https://curs.bnr.ro/nbrfxrates.xml';
     private const LAST_10_RECORDS = 'https://curs.bnr.ro/nbrfxrates10days.xml';
-    private const YEAR_RECORD = 'https://curs.bnr.ro/files/xml/years/nbrfxrates%S.xml';
+    private const YEAR_RECORD = 'https://curs.bnr.ro/files/xml/years/nbrfxrates%s.xml';
 
     public function __construct(
         private CacheInterface $cache = new NullCache(),
@@ -88,11 +89,52 @@ final readonly class NationalBankOfRomaniaService implements PesoServiceInterfac
         }
         $today = Calendar::fromDateTime($this->clock->now());
 
+        $rates = null;
+        $date = null;
         if ($today->sub($request->date) < 0) {
             return new ErrorResponse(new ExchangeRateNotFoundException('Date seems to be in future'));
         }
+        if ($today->sub($request->date) <= 15) { // up to 15 days we can find in the short response
+            $ratesXml = $this->getXmlData(self::LAST_10_RECORDS, $this->currentTtl);
+            [$rates, $date] = $this->findDayRates($request->date, $ratesXml);
+        }
+        if ($rates === null) { // not found or not in the last 15 days
+            $thisYear = $today->getYear() === $request->date->getYear();
+            $endpoint = \sprintf(self::YEAR_RECORD, $request->date->getYear());
+            $ratesXml = $this->getXmlData($endpoint, $thisYear ? $this->currentTtl : $this->historyTtl);
+            [$rates, $date] = $this->findDayRates($request->date, $ratesXml);
+        }
+        if ($rates === null) { // edge case: no data from the beginning of the year
+            $endpoint = \sprintf(self::YEAR_RECORD, $request->date->getYear() - 1);
+            $ratesXml = $this->getXmlData($endpoint, $this->historyTtl); // always historical ttl
+            [$rates, $date] = $this->findDayRates($request->date, $ratesXml);
+        }
 
-        throw new \Error('not implemented');
+        return isset($rates[$request->baseCurrency]) ?
+            new ExchangeRateResponse(new Decimal($rates[$request->baseCurrency]), $date) :
+            new ErrorResponse(ExchangeRateNotFoundException::fromRequest($request));
+    }
+
+    /**
+     * @param array<string, array<string, numeric-string>> $ratesXml
+     * @return array{0: array<string, numeric-string>, 1: Date}|null
+     */
+    private function findDayRates(Date $date, array $ratesXml): array|null
+    {
+        $dateStr = $date->toString();
+
+        if (isset($ratesXml[$dateStr])) { // easy mode
+            return [$ratesXml[$dateStr], $date];
+        }
+
+        foreach ($ratesXml as $dateKey => $rates) {
+            if (strcmp($dateKey, $dateStr) > 0) { // skip bigger values
+                continue;
+            }
+            return [$rates, Calendar::parse($dateKey)];
+        }
+
+        return null;
     }
 
     /**

@@ -32,6 +32,8 @@ final readonly class Body implements XmlDeserializable
             $dates[$key] = $value;
         }
 
+        krsort($dates); // year archives are sorted in ascending order, we need to reverse it
+
         return $dates;
     }
 }
