@@ -25,6 +25,20 @@ final readonly class MockClient
                 return new Response(body: fopen(__DIR__ . '/../data/nbrfxrates.xml', 'r'));
             },
         );
+        $client->on(
+            new RequestMatcher('/nbrfxrates10days.xml', 'curs.bnr.ro', ['GET'], ['https']),
+            static function () {
+                return new Response(body: fopen(__DIR__ . '/../data/nbrfxrates10days.xml', 'r'));
+            },
+        );
+        foreach ([2011, 2012, 2025] as $year) {
+            $client->on(
+                new RequestMatcher("/files/xml/years/nbrfxrates{$year}.xml", 'curs.bnr.ro', ['GET'], ['https']),
+                static function () use ($year) {
+                    return new Response(body: fopen(__DIR__ . "/../data/nbrfxrates{$year}.xml", 'r'));
+                },
+            );
+        }
 
         return $client;
     }
