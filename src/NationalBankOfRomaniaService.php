@@ -52,6 +52,32 @@ final readonly class NationalBankOfRomaniaService implements PesoServiceInterfac
     ) {
     }
 
+    public static function reversible(
+        CacheInterface $cache = new NullCache(),
+        DateInterval $currentTtl = new DateInterval('PT1H'),
+        DateInterval $historyTtl = new DateInterval('P7D'),
+        ClientInterface $httpClient = new DiscoveredHttpClient(),
+        RequestFactoryInterface $requestFactory = new DiscoveredRequestFactory(),
+        ClockInterface $clock = new SystemClock(),
+    ): PesoServiceInterface {
+        return new ReversibleService(new self($cache, $currentTtl, $historyTtl, $httpClient, $requestFactory, $clock));
+    }
+
+    public static function universal(
+        CacheInterface $cache = new NullCache(),
+        DateInterval $currentTtl = new DateInterval('PT1H'),
+        DateInterval $historyTtl = new DateInterval('P7D'),
+        ClientInterface $httpClient = new DiscoveredHttpClient(),
+        RequestFactoryInterface $requestFactory = new DiscoveredRequestFactory(),
+        ClockInterface $clock = new SystemClock(),
+    ): PesoServiceInterface {
+        return new IndirectExchangeService(
+            self::reversible($cache, $currentTtl, $historyTtl, $httpClient, $requestFactory, $clock),
+            'RON',
+        );
+    }
+
+
     /**
      * @inheritDoc
      */
